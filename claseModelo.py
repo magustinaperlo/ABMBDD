@@ -1,7 +1,9 @@
 import tkinter as tk
 from tkinter import HORIZONTAL, VERTICAL, Button, Entry, Frame, IntVar, Label, Scrollbar, StringVar, Tk, ttk
-from tkinter import messagebox as mb
+from tkinter import messagebox
 from tkinter import scrolledtext as st
+from unicodedata import numeric
+from unittest.util import _MAX_LENGTH
 from webbrowser import BackgroundBrowser
 from capaDatos import *
 
@@ -21,10 +23,10 @@ class Registro(Frame):
         self.frame4= Frame(master,bg='black')
         self.frame4.grid(column=0,row=2)
 
-        self.legajo =IntVar()
+        self.legajo =StringVar()
         self.apellido=StringVar()
         self.nombre=StringVar()
-        self.dni=IntVar()
+        self.dni=StringVar()
         self.domicilio=StringVar()
         self.buscar=IntVar()
 
@@ -52,9 +54,9 @@ class Registro(Frame):
         Label(self.frame4, text='Control',bg='black',fg='white',font=('Rockwell',12,'bold')).grid(columnspan=3,column=0,row=0,pady=1,padx=4)
         
         Button(self.frame4,command=self.agregar_datos,text= 'Registrar',font=('Arial',10,'bold'),bg='magenta2').grid(column=0,row=1,pady=10,padx=4)
-        Button(self.frame4,command=self.limpiar_campos,text= 'Limpiar',font=('Arial',10,'bold'),bg='magenta2').grid(column=0,row=2,pady=10,padx=4)
+        Button(self.frame4,command=self.limpiar_campos_tabla,text= 'Limpiar',font=('Arial',10,'bold'),bg='magenta2').grid(column=0,row=2,pady=10,padx=4)
         Button(self.frame4,command=self.eliminar_fila,text= 'Eliminar',font=('Arial',10,'bold'),bg='magenta2').grid(column=0,row=3,pady=10,padx=4)
-        Button(self.frame4,command=self.buscar_id,text= 'Buscar por Legajo',font=('Arial',10,'bold'),bg='magenta2').grid(column=1,row=4,pady=10,padx=4)
+        Button(self.frame4,command=self.buscar_legajo,text= 'Buscar por Legajo',font=('Arial',10,'bold'),bg='magenta2').grid(column=1,row=4,pady=10,padx=4)
         Entry(self.frame4,textvariable=self.buscar,font=('Arial',12),width=10).grid(column=0,row=4,pady=1,padx=8)
         Button(self.frame4,command=self.mostrar_todo,text= 'Mostrar datos de SQL',font=('Arial',10,'bold'),bg='green2').grid(columnspan=3,column=1,row=1,pady=10,padx=4)
 
@@ -65,8 +67,8 @@ class Registro(Frame):
         ladox.grid(column=0,row=1,sticky='ew')
         ladoy=Scrollbar(self.frame3, orient= VERTICAL,command=self.tabla.yview)
         ladoy.grid(column=1,row=0,sticky='ns')
+
         self.tabla.configure(xscrollcommand=ladox.set,yscrollcommand=ladoy.set)
-        
         self.tabla['columns'] = ('Apellido','Nombre','DNI','Domicilio')
 
         #se crea por defecto con el treeview
@@ -90,8 +92,7 @@ class Registro(Frame):
         estilo.map('Treeview',background=[('selected','green2')],foreground=[('selected','black')])
 
         self.tabla.bind("<<TreeviewSelect>>",self.obtener_fila)
-
-
+ 
     def agregar_datos(self):
         self.tabla.get_children()
         legajo=self.legajo.get()
@@ -99,13 +100,24 @@ class Registro(Frame):
         nombre=self.nombre.get()
         dni=self.dni.get()
         domicilio=self.domicilio.get()
-        datos = (legajo,apellido, nombre, dni,domicilio)
+        datos = (apellido, nombre, dni,domicilio)
         if legajo and apellido and nombre and dni and domicilio !='':
+            legajo_numerico(self,legajo)
+            dni_numerico(self,dni)
+            if self.base_datos.traerDni(dni) is False:
+               limpio_Dni(self)
+               return
+            validar_apellido(self,apellido)
+            validar_nombre(self,nombre)
             self.tabla.insert('',0,text=legajo, values=datos)
             self.base_datos.insertar(legajo,apellido,nombre,dni,domicilio)
+            limpiar_campos(self)
+        else:
+            messagebox.showerror(title="Opcion inválida",message="Debe completar todos los campos porque son obligatorios.")
 
+  
 
-    def limpiar_campos(self):
+    def limpiar_campos_tabla(self):
         self.tabla.delete(*self.tabla.get_children())
         self.legajo.set('')
         self.apellido.set('')
@@ -113,8 +125,7 @@ class Registro(Frame):
         self.dni.set('')
         self.domicilio.set('')
 
-
-    def buscar_id(self):
+    def buscar_legajo(self):
         legajo=self.buscar.get()
         legajoBuscado=self.base_datos.buscarAlumno(legajo)
         self.tabla.delete(*self.tabla.get_children())
@@ -122,8 +133,7 @@ class Registro(Frame):
         for dato in legajoBuscado:
             i=i+1 
             self.tabla.insert('',i,text=legajoBuscado[i][1:2],values=legajoBuscado[i][2:6])
-
-
+    
     def mostrar_todo(self):
         self.tabla.delete(*self.tabla.get_children())
         registro=self.base_datos.mostrar()
@@ -132,23 +142,65 @@ class Registro(Frame):
             i=i+1
             self.tabla.insert('',i,text=registro[i][1:2], values=registro[i][2:6])
 
-
     def eliminar_fila(self):
         fila=self.tabla.selection()
         if len(fila)!=0:
-            legajo=self.legajo.get()
+            #legajo=self.legajo.get()
             self.tabla.delete(fila)
-            self.base_datos.eliminarAlumno(legajo)
-
+            alumno = self.dniBorrar
+            self.base_datos.eliminarAlumno(alumno)
 
     def obtener_fila(self,event):
         current_item= self.tabla.focus()
         if not current_item:
             return
         data = self.tabla.item(current_item)
-        self.apellidoBorrar = data['values'][0]
+        self.dniBorrar = data['values'][2]
+        #self.apellidoBorrar = data['values'][0]
 
+def limpiar_campos(self):
+        self.legajo.set('')
+        self.apellido.set('')
+        self.nombre.set('')
+        self.dni.set('')
+        self.domicilio.set('')
 
+def limpio_Dni(self):
+     self.dni.set('')
+
+def legajo_numerico(self,legajo):
+        while len (legajo) not in range (4,6) or any(num.isalpha() for num in legajo):
+            messagebox.showerror(title="Opcion inválida",message="El campo Legajo acepta sólo números. Mínimo de caracteres: 4 y máximo de caracteres: 6")
+            self.legajo.set('')
+            legajo_numerico(legajo)
+        else:
+            legajoInt = int(legajo)
+            return True
+
+def dni_numerico(self,dni):
+        while len (dni) not in range (6, 9) or any(num.isalpha() for num in dni):
+            messagebox.showerror(title="Opcion inválida",message="El campo DNI acepta sólo números.Mínimo de caracteres: 6 y máximo de caracteres: 9")
+            self.dni.set('')
+            dni_numerico(dni)
+        else:
+            dniInt = int(dni)
+            return True
+  
+def validar_apellido(self,a):
+    while (a.isspace() or len(a) <= 2):
+        messagebox.showerror(title="Opcion inválida",message="Mínimo de carácteres en Apellido: 2 y no debe comenzar con un espacio")
+        self.apellido.set('')
+        validar_apellido(a)
+    else:
+        return True
+
+def validar_nombre(self,a):
+    while (a.isspace() or len(a) <= 1):
+        messagebox.showerror(title="Opcion inválida",message="Mínimo de carácteres en Nombre: 3 y no debe comenzar con un espacio")
+        self.nombre.set('')
+        validar_nombre(a)
+    else:
+        return True
 def main():
     ventana= Tk()
     ventana.wm_title=("Registro de Alumnos en Mysql")

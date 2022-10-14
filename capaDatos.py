@@ -1,4 +1,7 @@
+from operator import contains
+from queue import Empty
 import mysql.connector
+from tkinter import messagebox as mb
 
 class RegistroDatos:
     def __init__ (self):
@@ -14,6 +17,8 @@ class RegistroDatos:
         con.execute(sql)
         self.conexion.commit()
         con.close()
+        mb.showinfo(title="Opcion válida",message="Datos almacenados con éxito")
+        
 
     def mostrar(self):
         con = self.conexion.cursor()
@@ -30,11 +35,20 @@ class RegistroDatos:
         con.close()
         return registroX
 
-    def eliminarAlumno(self,legajo):
+    def eliminarAlumno(self,dni):
         con = self.conexion.cursor()
-        sql='''DELETE FROM alumno where Apellido = {}'''.format(legajo)
+        sql='''DELETE FROM alumno where DNI = {}'''.format(dni)
         con.execute(sql)
         self.conexion.commit()
         con.close()
-    
 
+    def traerDni(self,dni):
+        con = self.conexion.cursor()
+        sql="SELECT * FROM alumno where DNI = {}".format(dni)
+        con.execute(sql)
+        registroX = con.fetchall()
+        con.close()
+        if len(registroX)>0:            
+            mb.showerror(title="Opcion inválida",message="El DNI ingresado existe en la base de datos") 
+            return False
+        
